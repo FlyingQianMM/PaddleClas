@@ -200,10 +200,10 @@ class PatchEmbed(nn.Layer):
     """ Image to Patch Embedding
     """
 
-    def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
+    def __init__(self, img_size=[224, 224], patch_size=[16, 16], in_chans=3, embed_dim=768):
         super().__init__()
-        img_size = to_2tuple(img_size)
-        patch_size = to_2tuple(patch_size)
+        img_size = img_size
+        patch_size = patch_size
         num_patches = (img_size[1] // patch_size[1]) * \
             (img_size[0] // patch_size[0])
         self.img_size = img_size
@@ -227,8 +227,8 @@ class VisionTransformer(nn.Layer):
     """
 
     def __init__(self,
-                 img_size=224,
-                 patch_size=16,
+                 img_size=[224, 224],
+                 patch_size=[16, 16],
                  in_chans=3,
                  class_num=1000,
                  embed_dim=768,
@@ -288,6 +288,11 @@ class VisionTransformer(nn.Layer):
         trunc_normal_(self.pos_embed)
         trunc_normal_(self.cls_token)
         self.apply(self._init_weights)
+        _load_pretrained(
+            "./pretrained/ViT_base_patch16_384_pretrained",
+            self,
+            "./pretrained/ViT_base_patch16_384_pretrained.pdparams",
+            use_ssld=False)
 
     def _init_weights(self, m):
         if isinstance(m, nn.Linear):
@@ -309,7 +314,10 @@ class VisionTransformer(nn.Layer):
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
-        return x[:, 0]
+        # return x[:, 0]
+        x = x[:, 1:]
+        num_patches = [(self.patch_embed.img_size[0] // self.patch_embed.patch_size[0]), (self.patch_embed.img_size[1] // self.patch_embed.patch_size[1])]
+        return x.transpose([0, 2, 1]).reshape([-1,  self.embed_dim, *num_patches])
 
     def forward(self, x):
         x = self.forward_features(x)
@@ -320,6 +328,7 @@ class VisionTransformer(nn.Layer):
 def _load_pretrained(pretrained, model, model_url, use_ssld=False):
     if pretrained is False:
         pass
+    
     elif pretrained is True:
         load_dygraph_pretrain_from_url(model, model_url, use_ssld=use_ssld)
     elif isinstance(pretrained, str):
@@ -457,3 +466,4 @@ def ViT_large_patch32_384(pretrained=False, use_ssld=False, **kwargs):
         MODEL_URLS["ViT_large_patch32_384"],
         use_ssld=use_ssld)
     return model
+
